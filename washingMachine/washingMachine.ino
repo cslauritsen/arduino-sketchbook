@@ -1,8 +1,8 @@
-
+#include "gitcommit.h"
 // NODE CONFIGUATION *******************************************
-#define SKETCH_NAME "WashMachine Sensor"
+#define SKETCH_NAME "Washing Machine"
 #define SKETCH_MAJOR_VER "1"
-#define SKETCH_MINOR_VER "1"
+#define SKETCH_MINOR_VER GIT_COMMIT_ID
 
 #define NODEID 0x03
 #define PARENT_NODEID AUTO
@@ -37,29 +37,23 @@ boolean soundPresent = false;
 boolean wetPresent = false;
 
 void onSound() {
-  soundPresent = true;
+  soundPresent = digitalRead(SOUND_PIN) == LOW;
 }
 void onWet() {
-  wetPresent = true;
+  wetPresent = digitalRead(WET_PIN) == LOW;
 }
 
 void setup()  
 {
-  #ifdef CSL_DEBUG
-  Serial.begin(9600);
-  #endif
-   // use the 1.1 V internal reference
-#if defined(__AVR_ATmega2560__)
-   analogReference(INTERNAL1V1);
-#else
-   analogReference(INTERNAL);
-#endif
+ 
 
   sensor_node.begin(NULL, NODEID, REPEATER_NODE, PARENT_NODEID);
 
-  pinMode(SOUND_PIN, INPUT);
+  pinMode(SOUND_PIN, INPUT); 
+  pinMode(WET_PIN, INPUT);
   // Activate internal pull-ups
   digitalWrite(SOUND_PIN, HIGH);
+  digitalWrite(WET_PIN, HIGH);
   
   // Send the sketch version information to the gateway and Controller
   sensor_node.sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
@@ -67,45 +61,31 @@ void setup()
   // Register binary input sensor to sensor_node (they will be created as child devices)
   // You can use S_DOOR, S_MOTION or S_LIGHT here depending on your usage. 
   // If S_LIGHT is used, remember to update variable type you send in. See "msg" above.
-  sensor_node.present(SOUND_CHILD_ID, S_SOUND, "Washing Machine Sound", true);  
-  sensor_node.present(WET_CHILD_ID, S_WATER_LEAK, "Washing Machine Leak", true);
+  sensor_node.present(SOUND_CHILD_ID, S_SOUND, "Washer Sound", true);  
+  sensor_node.present(WET_CHILD_ID, S_WATER_LEAK, "Washer Leak", true);
   
-  attachInterrupt(digitalPinToInterrupt(SOUND_PIN), onSound, FALLING); 
-  attachInterrupt(digitalPinToInterrupt(WET_PIN), onWet, FALLING); 
+  attachInterrupt(digitalPinToInterrupt(SOUND_PIN), onSound, CHANGE); 
+  attachInterrupt(digitalPinToInterrupt(WET_PIN), onWet, CHANGE); 
 }
 
-
-
-long lastTime = -1;
-long soundResetTime = -1;
-long wetResetTime = -1;
-
+boolean lastWet = wetPresent;
+boolean lastSound = soundPresent;
+long elapsed = 0;
 void loop() {
-  long m = millis();
-    if (m - lastTime > 1000) {
-      
-      int val = analogRead(WET_PIN);
-      wetPresent = val > 100;
-      sensor_node.send(msgSound.set(soundPresent));
-      sensor_node.send(msgWet.set(wetPresent));
- 
-#ifdef CSL_DEBUG
-      Serial.print("Sound at: ");
-      Serial.print(m);
-      Serial.print(": ");
-      Serial.print(soundPresent);     
-      Serial.print(" Moisture: ");
-      Serial.println(val);
-#endif
-      lastTime = m;
-    }
-    
-    if (m - soundResetTime > 10000) {
-      soundPresent = false;
-      soundResetTime = m;
-    }
-    if (m - wetResetTime > 15000) {
-      wetPresent = false;
-      wetResetTime = m;
-    }  
+  sensor_node.process();
+  if (lastWet != wetPresent) {
+    sensor_node.send(msgWet.set(wetPresent));
+    lastWet = wetPresent;
+  }
+  if (lastSound != soundPresent) {
+    sensor_node.send(msgSound.set(soundPresent));
+    lastSound = soundPresent;
+  }
+  
+  if (elapsed > 10L * 60 * 1000) {
+    elapsed = 0;
+    sensor_node.send(msgSound.set(soundPresent));
+    sensor_node.send(msgWet.set(wetPresent));
+  }
+  elapsed = millis();
 }
