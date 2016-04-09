@@ -1,4 +1,4 @@
-#include "gitcommit.h"
+#include <gitcommit.h>
 
 // NODE CONFIGUATION *******************************************
 #define SKETCH_NAME "Washing Machine"
