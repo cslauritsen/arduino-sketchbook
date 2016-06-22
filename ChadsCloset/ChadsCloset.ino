@@ -27,6 +27,8 @@
  *
  */
 
+ #define DEBUG 
+
 #include <MySensor.h>  
 #include <SPI.h>
 #include <Wire.h>
@@ -35,8 +37,9 @@
 #define BARO_CHILD 0
 #define TEMP_CHILD 1
 #define MOTION_CHILD 2
+#define BATTERY_SENSE_PIN A0
 
-unsigned long SLEEP_TIME = 120000; // Sleep time between reports (in milliseconds)
+unsigned long SLEEP_TIME = 1000L * 60L * 60L; // Sleep time between reports (in milliseconds)
 #define MOTION_PIN 2   // The digital input you attached your motion sensor.  (Only 2 and 3 generates interrupt!)
 #define INTERRUPT MOTION_PIN-2 // Usually the interrupt = pin -2 (on uno/nano anyway)
 
@@ -88,8 +91,71 @@ bool bmpConnected = false;
 #define REPEATER_NODE false
 #define PARENT_NODEID AUTO
 #define NODEID 0x21
+
+
+void sendBatteryVoltage() {
+   static int oldBatteryPcnt;
+   static int batterySensorValue;
+   static float batteryV;
+   static int batteryPcnt;
+   static int invocations;
+   
+   batterySensorValue = analogRead(BATTERY_SENSE_PIN);
+   #ifdef DEBUG
+   Serial.println(batterySensorValue);
+   #endif
+   
+   // Chad's setup:
+   // Vmax = 6.6V
+   // Resistor series:  1M + 100k + 100k
+   //  V_a0 = 2e5Ω / 1.2e6Ω * Vmax
+   //       =  0.166666 * 6.6V
+   //       =  1.1V = Arduino Analog Ref Voltage
+   #define V_MAX 6.6
+   #define ANALOG_RESOLUTION_BITS 1023
+   #define VOLTS_PER_BIT (V_MAX/ANALOG_RESOLUTION_BITS)  // <=  V_MAX / ANALOG_RESOLUTION_BITS
+   
+   batteryV  = batterySensorValue * VOLTS_PER_BIT;
+   
+/*   
+                        CONNECT A0 HERE
+                              |
+                              v
+   
+                          0.1666*6.6V
+                  6.6V       = 1.1V             0.0833*1.1V          0*6.6V
+         [6.6V] ----- 1M ------------- 100k ---------------- 100k ------+
+                              |                                       |
+                             ___   Noise Filter Cap                   |   
+                             ___  C1 1uF                              |  
+                              |                                       |
+                            -----                                   -----
+                             ---                                     ---
+                              -                                       -
+ */   
+   
+   
+   batteryPcnt = 100 * batteryV / V_MAX;
+
+   #ifdef DEBUG
+   Serial.print("Battery Voltage: ");
+   Serial.print(batteryV);
+   Serial.println(" V");
+
+   Serial.print("Battery percent: ");
+   Serial.print(batteryPcnt);
+   Serial.println(" %");
+   #endif
+
+   if (invocations++ % 5 == 0 || oldBatteryPcnt != batteryPcnt) {
+     gw.sendBatteryLevel(batteryPcnt);
+     oldBatteryPcnt = batteryPcnt;
+   }
+}
+
 void setup()  
 {  
+  analogReference(INTERNAL);
   Serial.begin(19200);
   gw.begin(NULL, NODEID, REPEATER_NODE, PARENT_NODEID);
   pinMode(8, OUTPUT);
@@ -120,7 +186,7 @@ void setup()
       }
 	metric = gw.getConfig().isMetric;
   
-  
+  sendBatteryVoltage();
   
 }
 
@@ -175,8 +241,9 @@ void loop()
   Serial.println(tripped);
   gw.send(motionMsg.set(tripped?"1":"0"));  // Send tripped value to gw 
  
-  // Sleep until interrupt comes in on motion sensor. Send update every two minute. 
-  gw.sleep(INTERRUPT,CHANGE, SLEEP_TIME);
+  // Sleep until interrupt comes in on motion sensor. Send update every SLEEP_TIME. 
+  gw.sleep(INTERRUPT,CHANGE, SLEEP_TIME);  
+  sendBatteryVoltage();
 }
 
 
@@ -336,5 +403,6 @@ int sample(float pressure)
 
 	return forecast;
 }
+
 
 
