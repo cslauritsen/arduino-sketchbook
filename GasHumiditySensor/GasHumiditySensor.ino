@@ -51,7 +51,7 @@ int gasReading = -1;
 void loop()      
 {  
   gw.process();
-  if (millis() > 5L * 60L * 60L * 1000L) {
+  if (millis() > 5L * 60L * 1000L) {
     // need to let the coil heatup for 5 minutes before giving out gas readings
     gasReading = analogRead(GAS_PIN);
     if (lastGasReading != gasReading) {
