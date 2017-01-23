@@ -114,6 +114,9 @@ void loop()
   if (bmpConnected) {
     float pressure = bmp.readSealevelPressure(ALTITUDE) / 100.0;
     float temperature2 = bmp.readTemperature();
+    if (!metric) {
+      temperature2 = dht.toFahrenheit(temperature2);
+    }
   
     gw.send(msgBaro.set(pressure, 1));
     gw.send(msgTemp2.set(temperature2, 1));
