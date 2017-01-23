@@ -3,7 +3,9 @@
 #include <MySensor.h>  
 #include <DHT.h>
 #include <Adafruit_BMP085.h>
-  
+
+#define DEBUG
+
 #define BATTERY_SENSE_PIN A0
 #define MOTION_PIN 2   // The digital input you attached your motion sensor.  (Only 2 and 3 generates interrupt!)
 #define INTERRUPT MOTION_PIN-2 // Usually the interrupt = pin -2 (on uno/nano anyway)

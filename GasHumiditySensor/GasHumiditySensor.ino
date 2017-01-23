@@ -81,10 +81,16 @@ void loop()
       doSend = true;
   }
 
-  if (millis() - lastSend > 60000L) {
+  long diff = abs(millis() - lastSend);
+  if (diff > 60000L) {
     // Send at least 1x/minute, even if values haven't changed
     doSend = true;
   }
+  else if (diff < 10000L) {
+    // don't send more freq than 1x/10secs
+    doSend = false;
+  }
+
   
   if (doSend) {
     if (!metric) {
@@ -101,26 +107,8 @@ void loop()
     Serial.println(gasReading);
     doSend = false;
     lastSend = millis();
+    if (lastSend < 0) {
+      lastSend = 0;
+    }
   }
 }
-
-void incomingMessage(const MyMessage &message) {
-  #ifdef CSLDEBUG
-  char pbuf[2*MAX_PAYLOAD+1];
-  Serial.print(",mt=");
-  Serial.print(message.type);
-  Serial.print(",sens=");
-  Serial.print(message.sensor);
-  Serial.print(",sndr=");
-  Serial.print(message.sender);
-  Serial.print(",dest=");
-  Serial.print(message.destination);
-  Serial.print(",dest=");
-  Serial.print(message.destination);
-  Serial.print(",payx=");
-  message.getString(pbuf);
-  Serial.println(pbuf);
-  #endif
-}
-
-
